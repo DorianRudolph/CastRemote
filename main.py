@@ -8,34 +8,42 @@ from kivymd.uix.menu import MDDropdownMenu
 
 KV = '''
 # kv_start
-Screen:
+GridLayout:
+    cols: 1
+    height: self.minimum_height
+    spacing: "10dp"
+    
     MDToolbar:
         title: "Cast Remote"
         id: toolbar
-        pos_hint: {"top": 1}
-        right_action_items: [["brightness-6", lambda x: app.switch_theme_style()]]
+        right_action_items: [["brightness-6", lambda x: app.switch_theme_style()]]    
     
     MDBoxLayout:
-        size_hint: 1, None
-        height: self.minimum_height + toolbar.height
-        y: root.height - toolbar.height - self.height
-        orientation: "vertical"
+        size_hint_x: 1
+        adaptive_height: True
+        spacing: "10dp"
+        padding: "10dp"
         
-        MDLabel:
-            text: "Content"
-            halign: "center"
-            
-        MDLabel:
-            text: "Test"
-            
-        MDIconButton:
-            icon: "language-python"
+        MDRaisedIconButton:
+            text: "Scan"
+            icon: "refresh"
             
         MDDropDownItem:
+            size_hint_x: 1
             id: cast_selector
             text: "Item 0"
             current_item: "Item 0"
             on_release: app.cast_menu.open()
+            pos_hint: {"center_y": .5}
+
+    
+    MDRaisedButton:    
+        text: "Hello"
+        pos_hint: {"center_x": .5}
+        
+    MDRaisedButton:    
+        text: "Hello"
+    
 # kv_end
 '''
 
@@ -51,7 +59,7 @@ class CastRemoteApp(MDApp):
         self.settings = store.get(Settings.key)["settings"]
         self.theme_cls.theme_style = self.settings.theme
         self.screen = Builder.load_string(KV)
-        menu_items = [{"icon": "git", "text": f"Item {i}"} for i in range(5)]
+        menu_items = [{"icon": "git", "text": f"Item asdfasdfasdfa {i}"} for i in range(5)]
         self.cast_menu = MDDropdownMenu(
             caller=self.screen.ids.cast_selector,
             items=menu_items,
