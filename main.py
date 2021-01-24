@@ -1,43 +1,70 @@
 from kivy.lang import Builder
 from kivy.config import Config
 from kivy.storage.dictstore import DictStore
+from kivy.uix.screenmanager import Screen
 
 from kivymd.app import MDApp
+from kivymd.uix.menu import MDDropdownMenu
 
 KV = '''
 # kv_start
-MDBoxLayout:
-    orientation: "vertical"
-
+Screen:
     MDToolbar:
         title: "Cast Remote"
+        id: toolbar
+        pos_hint: {"top": 1}
         right_action_items: [["brightness-6", lambda x: app.switch_theme_style()]]
-
-    MDLabel:
-        text: "Content"
-        halign: "center"
+    
+    MDBoxLayout:
+        size_hint: 1, None
+        height: self.minimum_height + toolbar.height
+        y: root.height - toolbar.height - self.height
+        orientation: "vertical"
+        
+        MDLabel:
+            text: "Content"
+            halign: "center"
+            
+        MDLabel:
+            text: "Test"
+            
+        MDIconButton:
+            icon: "language-python"
+            
+        MDDropDownItem:
+            id: cast_selector
+            text: "Item 0"
+            current_item: "Item 0"
+            on_release: app.cast_menu.open()
 # kv_end
 '''
 
 
 class Settings:
     key = "settings"
-    
-    def __init__(self):
-        self.theme = "Dark"
+    theme = "Dark"
 
 
-class CastRemote(MDApp):
+class CastRemoteApp(MDApp):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.settings = store.get(Settings.key)["settings"]
+        self.theme_cls.theme_style = self.settings.theme
+        self.screen = Builder.load_string(KV)
+        menu_items = [{"icon": "git", "text": f"Item {i}"} for i in range(5)]
+        self.cast_menu = MDDropdownMenu(
+            caller=self.screen.ids.cast_selector,
+            items=menu_items,
+            width_mult=4,
+        )
+        self.cast_menu.bind(on_release=self.set_item)
+
+    def set_item(self, instance_menu, instance_menu_item):
+        self.screen.ids.cast_selector.set_item(instance_menu_item.text)
+        self.cast_menu.dismiss()
 
     def build(self):
-        self.theme_cls.theme_style = self.settings.theme
-        return Builder.load_string(KV)
-
-    def on_start(self):
-        pass
+        return self.screen
 
     def on_stop(self):
         self.save()
@@ -55,8 +82,8 @@ class CastRemote(MDApp):
 
 
 if __name__ == "__main__":
-    Config.set('input', 'mouse', 'mouse,multitouch_on_demand')
-    store = DictStore("cast_remote.pickle")
+    Config.set('input', 'mouse', 'mouse,multitouch_on_demand')  # disable red dots on right click
+    store = DictStore("cast_remote.pickle")  # TODO path for android
     if not store.exists(Settings.key):
         store.put(Settings.key, settings=Settings())
-    CastRemote().run()
+    CastRemoteApp().run()
