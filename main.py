@@ -99,6 +99,8 @@ class CastRemoteApp(MDApp):
     cast_dialog_items = None
     browser = None
     cast = None
+    cast_status = None
+    media_status = None
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)        
@@ -149,13 +151,33 @@ class CastRemoteApp(MDApp):
                 print("already connected")
                 return
             else:
+                self.set_cast_icon(False)
+                self.cast.media_controller.unregister_status_listener(self)
+                self.cast.unregister_status_listener(self)
                 self.cast.disconnect()
+        self.cast_status = self.media_status = None
         self.cast = pychromecast.get_chromecast_from_service(device, self.zconf)
+        self.cast.media_controller.register_status_listener(self)
+        self.cast.register_status_listener(self)
         self.cast.start()
 
     def cast_dialog_dismiss(self, *args):
         print("dismissed dialog")
         pychromecast.stop_discovery(self.browser)
+        
+    def new_media_status(self, status):
+        self.media_status = status
+        print("media status", status)
+
+    def new_cast_status(self, status):
+        if self.cast_status is None:
+            self.set_cast_icon(True)
+            # initial connect
+        self.cast_status = status
+        print("cast status", status)
+
+    def set_cast_icon(self, connected):
+        self.screen.ids.toolbar.ids.right_actions.children[1].icon = "cast" + "-connected" * connected
 
 
 if __name__ == "__main__":
