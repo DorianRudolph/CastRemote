@@ -1,0 +1,4 @@
+https://github.com/kivymd/KivyMD/archive/master.zip
+https://github.com/DorianRudolph/pychromecast/archive/playback_rate.zip
+youtube-dl
+kivy
