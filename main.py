@@ -3,18 +3,21 @@ from kivy.config import Config
 from kivy.storage.dictstore import DictStore
 from kivy.uix.screenmanager import Screen
 from kivy.properties import StringProperty
+from kivy.core.window import Window
 
 from kivymd.app import MDApp
 from kivymd.uix.menu import MDDropdownMenu
-from kivymd.uix.list import OneLineListItem, OneLineIconListItem
+from kivymd.uix.list import TwoLineIconListItem
 from kivymd.uix.dialog import MDDialog
 
 import pychromecast
+import zeroconf
 
 KV = '''
 # kv_start
     
 <Item>:
+    on_release: print("release", self.text, self.uuid)
     IconLeftWidget:
         icon: root.icon
 
@@ -64,18 +67,38 @@ GridLayout:
 '''
 
 
-class Item(OneLineIconListItem):
+class Item(TwoLineIconListItem):
     icon = StringProperty()
+    uuid = StringProperty()
 
 
 class Settings:
     key = "settings"
     theme = "Dark"
     last_cast = None
+    
+    
+def update_dialog_items(dialog, items):
+    dialog.ids.box_items.clear_widgets()
+
+    # copied from create_dialog_items
+    height = 0
+    for item in items:
+        height += item.height  # calculate height contents
+        dialog.edit_padding_for_item(item)
+        dialog.ids.box_items.add_widget(item)
+
+    if height > Window.height:
+        dialog.set_normal_height()
+        dialog.ids.scroll.height = dialog.get_normal_height()
+    else:
+        dialog.ids.scroll.height = height
 
 
 class CastRemoteApp(MDApp):
     cast_dialog = None
+    cast_dialog_items = None
+    browser = None
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)        
@@ -92,7 +115,18 @@ class CastRemoteApp(MDApp):
         )
         self.cast_menu.bind(on_release=self.set_item)
 
-        self.casts, self.browser = pychromecast.start_discovery()
+        self.cast_listener = pychromecast.CastListener(self.update_chromecast_discovery, self.update_chromecast_discovery, self.update_chromecast_discovery)
+        self.zconf = zeroconf.Zeroconf()
+
+    def update_chromecast_discovery(self, *args):
+        self.cast_dialog_items = [
+            Item(text=device[3], secondary_text=device[2], uuid=str(device[1]), icon="monitor")
+            for device in self.cast_listener.devices
+        ]
+        self.cast_dialog_items.sort(key=lambda i: i.text)
+        update_dialog_items(self.cast_dialog, self.cast_dialog_items)
+        for device in self.cast_listener.devices:
+            print(device)
 
     def set_item(self, instance_menu, instance_menu_item):
         self.screen.ids.cast_selector.set_item(instance_menu_item.text)
@@ -117,10 +151,13 @@ class CastRemoteApp(MDApp):
 
     def select_cast(self):
         if not self.cast_dialog:
-            self.cast_dialog = MDDialog(title="Select Chromecast", type="simple")
-        self.cast_dialog.items = [Item(text="B", icon="monitor"), Item(text="Hello", icon="monitor")]
-        self.cast_dialog.create_items()
+            self.cast_dialog = MDDialog(title="Select Chromecast", type="simple", on_dismiss=self.cast_dialog_dismiss)
         self.cast_dialog.open()
+        self.browser = pychromecast.start_discovery(self.cast_listener, self.zconf)
+        
+    def cast_dialog_dismiss(self, *args):
+        print("dismissed dialog")
+        pychromecast.stop_discovery(self.browser)
 
 
 if __name__ == "__main__":
