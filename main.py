@@ -6,7 +6,6 @@ from kivy.properties import StringProperty
 from kivy.core.window import Window
 
 from kivymd.app import MDApp
-from kivymd.uix.menu import MDDropdownMenu
 from kivymd.uix.list import TwoLineIconListItem
 from kivymd.uix.dialog import MDDialog
 
@@ -36,25 +35,6 @@ GridLayout:
         text: "  Selected Chromecast: <none>"
         height: "20dp"
         size_hint_y: None
-    
-    MDBoxLayout:
-        size_hint_x: 1
-        adaptive_height: True
-        spacing: "10dp"
-        padding: "10dp"
-        
-        MDRaisedButton:
-            text: "Scan"
-            icon: "refresh"
-            
-        MDDropDownItem:
-            size_hint_x: 1
-            id: cast_selector
-            text: "Item 0"
-            current_item: "Item 0"
-            on_release: app.cast_menu.open()
-            pos_hint: {"center_y": .5}
-
     
     MDRaisedButton:    
         text: "Hello"
@@ -106,14 +86,6 @@ class CastRemoteApp(MDApp):
         self.theme_cls.theme_style = self.settings.theme
         
         self.screen = Builder.load_string(KV)
-        
-        menu_items = [{"icon": "git", "text": f"Item asdfasdfasdfa {i}"} for i in range(5)]
-        self.cast_menu = MDDropdownMenu(
-            caller=self.screen.ids.cast_selector,
-            items=menu_items,
-            width_mult=4,
-        )
-        self.cast_menu.bind(on_release=self.set_item)
 
         self.cast_listener = pychromecast.CastListener(self.update_chromecast_discovery, self.update_chromecast_discovery, self.update_chromecast_discovery)
         self.zconf = zeroconf.Zeroconf()
@@ -127,10 +99,6 @@ class CastRemoteApp(MDApp):
         update_dialog_items(self.cast_dialog, self.cast_dialog_items)
         for device in self.cast_listener.devices:
             print(device)
-
-    def set_item(self, instance_menu, instance_menu_item):
-        self.screen.ids.cast_selector.set_item(instance_menu_item.text)
-        self.cast_menu.dismiss()
 
     def build(self):
         return self.screen
