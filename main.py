@@ -10,12 +10,13 @@ from kivymd.app import MDApp
 from kivymd.uix.list import TwoLineIconListItem
 from kivymd.uix.dialog import MDDialog
 
+from pychromecast.controllers.media import MEDIA_PLAYER_STATE_PAUSED
+
 import pychromecast
 import zeroconf
+import datetime
 
-KV = r'''
-# kv_start
-    
+KV = r'''    
 <CastItem>:
     on_release: app.select_cast(self.device)
     text: self.device[3]
@@ -33,6 +34,43 @@ BoxLayout:
         id: toolbar
         right_action_items: [["cast", lambda x: app.show_select_dialog()], ["brightness-6", lambda x: app.switch_theme_style()]]
         
+    BoxLayout:
+        height: self.minimum_height
+        size_hint: 1, None
+        # spacing: "10dp"
+        MDIconButton:
+            icon: "play"
+            id: play_button
+            pos_hint: {'center_y': 0.5}
+            user_font_size: "32sp"
+            on_press: app.play_pause()
+        MDLabel:
+            id: time_label
+            size_hint: None, None
+            size: self.texture_size
+            pos_hint: {'center_y': 0.5}
+        MDSlider:
+            id: seek_slider
+            min: 0
+            max: 100
+            value: 0
+            size_hint: 1, None
+            height: "32sp"
+            hint: False
+            pos_hint: {'center_y': 0.5}
+            on_active: if not self.active: app.seek(self.value)
+        MDIconButton:
+            id: stop_button
+            icon: "stop"
+            pos_hint: {'center_y': 0.5}
+            user_font_size: "32sp"
+            on_press: app.stop_button()
+
+
+        # MDLabel:
+        #     height: "10dp"
+        #     text: "12:01:12"
+         
     ScrollView:
         
         GridLayout:
@@ -41,16 +79,15 @@ BoxLayout:
             size_hint: 1, None
             padding: "10dp"
             spacing: "10dp"
-
+            height: self.minimum_height
+            
             MDLabel:
-                id: status
+                id: status_label
                 height: self.texture_size[1]
                 size_hint_y: None
 
             MDRaisedButton:    
                 text: "Hello"
-    
-# kv_end
 '''
 
 
@@ -81,7 +118,12 @@ def update_dialog_items(dialog, items):
         dialog.ids.scroll.height = dialog.get_normal_height()
     else:
         dialog.ids.scroll.height = height
+        
 
+def format_time(seconds):
+    s = int(seconds)
+    return f"{s//3600}:{s//60%60:02}:{s%60:02}" if s >= 3600 else f"{s//60}:{s%60:02}"
+    
 
 class CastRemoteApp(MDApp):
     cast_dialog = None
@@ -91,6 +133,8 @@ class CastRemoteApp(MDApp):
     cast_status = None
     media_status = None
     first_connect = False
+    is_playing = False
+    seeking = False
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)        
@@ -98,12 +142,12 @@ class CastRemoteApp(MDApp):
         self.theme_cls.theme_style = self.settings.theme
         
         self.screen = Builder.load_string(KV)
-        self.update_status_label()
+        self.update_state()
 
         self.cast_listener = pychromecast.CastListener(self.update_chromecast_discovery, self.update_chromecast_discovery, self.update_chromecast_discovery)
         self.zconf = zeroconf.Zeroconf()
         self.browser = pychromecast.start_discovery(self.cast_listener, self.zconf)
-        
+
         Clock.schedule_interval(self.tick, 0.2)
 
     def update_chromecast_discovery(self, *args):
@@ -120,7 +164,7 @@ class CastRemoteApp(MDApp):
             update_dialog_items(self.cast_dialog, self.cast_dialog_items)
     
     def tick(self, dt):
-        self.update_status_label()
+        self.update_state()
 
     def build(self):
         return self.screen
@@ -172,8 +216,8 @@ class CastRemoteApp(MDApp):
         self.settings.last_uuid = self.cast.uuid
         self.save()
 
-        self.update_status_label()
-        
+        self.update_state()
+
     def cast_dialog_dismiss(self, *args):
         print("dismissed dialog")
         pychromecast.stop_discovery(self.browser)
@@ -181,7 +225,7 @@ class CastRemoteApp(MDApp):
         
     def new_media_status(self, status):
         self.media_status = status
-        self.update_status_label()
+        self.update_state()
         print("media status", status)
 
     def new_cast_status(self, status):
@@ -189,31 +233,71 @@ class CastRemoteApp(MDApp):
             self.set_cast_icon(True)
             # initial connect
         self.cast_status = status
-        self.update_status_label()
+        self.update_state()
         print("cast status", status)
         
-    def update_status_label(self):
-        if not self.cast:
-            text = "No Connection"
+    def play_pause(self, *args):
+        if self.is_playing:
+            self.cast.media_controller.pause()
         else:
-            text = f"Connection: {self.cast.name} ({self.cast.model_name})"
-            if cs := self.cast_status:
-                text += f"""
+            self.cast.media_controller.play()
+            
+    def stop_button(self):
+        self.cast.media_controller.stop()
+        
+    def seek(self, pos):
+        self.cast.media_controller.seek(pos)
+
+    def update_state(self):
+        if self.cast:
+            status_text = f"Connection: {self.cast.name} ({self.cast.model_name})"
+        else:
+            status_text = "No Connection"
+
+        play_button = self.screen.ids.play_button
+        stop_button = self.screen.ids.stop_button
+        seek_slider = self.screen.ids.seek_slider
+        time_label = self.screen.ids.time_label
+
+        if cs := self.cast_status:
+            status_text += f"""
 Volume: {round(cs.volume_level*100)}%{' (muted)' * cs.volume_muted}
 display_name: {cs.display_name}
 status_text: {cs.status_text}
-icon_url: {cs.icon_url}
 is_stand_by: {cs.is_stand_by}
 is_active_input: {cs.is_active_input}"""
-            if ms := self.media_status:
-                text += f"""
+        if ms := self.media_status:
+            status_text += f"""
 title: {ms.title}
+subtitle: {0}
 supports:{' pause' * ms.supports_pause + ' seek' * ms.supports_seek + ' playback_rate' * ms.supports_playback_rate}
 time: {ms.adjusted_current_time}/{ms.duration}
 rate: {ms.playback_rate}
 player_state: {ms.player_state}
 supports:{' pause' * ms.supports_pause + ' seek' * ms.supports_seek + ' playback_rate' * ms.supports_playback_rate}"""
-        self.screen.ids.status.text = text
+            self.is_playing = ms.player_state != MEDIA_PLAYER_STATE_PAUSED
+            play_button.icon = ["play", "pause"][self.is_playing]
+            play_button.disabled = not ms.supports_pause
+            seek_slider.max = int(max(ms.adjusted_current_time, ms.duration or 0))
+            
+            if not seek_slider.active:
+                seek_slider.value = int(ms.adjusted_current_time)
+
+            seek_slider.disabled = not ms.supports_seek
+            time_label.text_size = None, None
+            time_label.text = f"{format_time(ms.adjusted_current_time)} / {format_time(ms.duration) if ms.duration else '-'}"
+            stop_button.disabled = False
+        else:
+            play_button.icon = "play"
+            play_button.disabled = True
+            stop_button.disabled = True
+            seek_slider.disabled = True
+            # time_label.text = "-/-"
+        
+        self.screen.ids.status_label.text = status_text
+        
+
+
 
     def set_cast_icon(self, connected):
         self.screen.ids.toolbar.ids.right_actions.children[1].icon = "cast" + "-connected" * connected
