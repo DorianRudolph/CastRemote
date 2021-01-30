@@ -13,7 +13,7 @@ from kivymd.uix.dialog import MDDialog
 import pychromecast
 import zeroconf
 
-KV = '''
+KV = r'''
 # kv_start
     
 <CastItem>:
@@ -43,23 +43,9 @@ BoxLayout:
             spacing: "10dp"
 
             MDLabel:
-                id: selected_cast
-                text: "  Selected Chromecast: <none>"
-                height: "20dp"
+                id: status
+                height: self.texture_size[1]
                 size_hint_y: None
-
-            MDRaisedButton:    
-                text: "Hello"
-                pos_hint: {"center_x": .5}
-
-            MDRaisedButton:    
-                text: "Hello"
-
-            MDRaisedButton:    
-                text: "Hello"
-
-            MDRaisedButton:    
-                text: "Hello"
 
             MDRaisedButton:    
                 text: "Hello"
@@ -112,10 +98,13 @@ class CastRemoteApp(MDApp):
         self.theme_cls.theme_style = self.settings.theme
         
         self.screen = Builder.load_string(KV)
+        self.update_status_label()
 
         self.cast_listener = pychromecast.CastListener(self.update_chromecast_discovery, self.update_chromecast_discovery, self.update_chromecast_discovery)
         self.zconf = zeroconf.Zeroconf()
         self.browser = pychromecast.start_discovery(self.cast_listener, self.zconf)
+        
+        Clock.schedule_interval(self.tick, 0.2)
 
     def update_chromecast_discovery(self, *args):
         self.cast_dialog_items = [
@@ -129,6 +118,9 @@ class CastRemoteApp(MDApp):
                 self.select_cast(devices[0])
         if self.cast_dialog:
             update_dialog_items(self.cast_dialog, self.cast_dialog_items)
+    
+    def tick(self, dt):
+        self.update_status_label()
 
     def build(self):
         return self.screen
@@ -170,6 +162,7 @@ class CastRemoteApp(MDApp):
                 self.cast.unregister_status_listener(self)
                 self.cast.disconnect()
         self.cast_status = self.media_status = None
+
         self.cast = pychromecast.get_chromecast_from_service(device, self.zconf)
         self.cast.media_controller.register_status_listener(self)
         self.cast.register_status_listener(self)
@@ -179,6 +172,8 @@ class CastRemoteApp(MDApp):
         self.settings.last_uuid = self.cast.uuid
         self.save()
 
+        self.update_status_label()
+        
     def cast_dialog_dismiss(self, *args):
         print("dismissed dialog")
         pychromecast.stop_discovery(self.browser)
@@ -186,6 +181,7 @@ class CastRemoteApp(MDApp):
         
     def new_media_status(self, status):
         self.media_status = status
+        self.update_status_label()
         print("media status", status)
 
     def new_cast_status(self, status):
@@ -193,7 +189,31 @@ class CastRemoteApp(MDApp):
             self.set_cast_icon(True)
             # initial connect
         self.cast_status = status
+        self.update_status_label()
         print("cast status", status)
+        
+    def update_status_label(self):
+        if not self.cast:
+            text = "No Connection"
+        else:
+            text = f"Connection: {self.cast.name} ({self.cast.model_name})"
+            if cs := self.cast_status:
+                text += f"""
+Volume: {round(cs.volume_level*100)}%{' (muted)' * cs.volume_muted}
+display_name: {cs.display_name}
+status_text: {cs.status_text}
+icon_url: {cs.icon_url}
+is_stand_by: {cs.is_stand_by}
+is_active_input: {cs.is_active_input}"""
+            if ms := self.media_status:
+                text += f"""
+title: {ms.title}
+supports:{' pause' * ms.supports_pause + ' seek' * ms.supports_seek + ' playback_rate' * ms.supports_playback_rate}
+time: {ms.adjusted_current_time}/{ms.duration}
+rate: {ms.playback_rate}
+player_state: {ms.player_state}
+supports:{' pause' * ms.supports_pause + ' seek' * ms.supports_seek + ' playback_rate' * ms.supports_playback_rate}"""
+        self.screen.ids.status.text = text
 
     def set_cast_icon(self, connected):
         self.screen.ids.toolbar.ids.right_actions.children[1].icon = "cast" + "-connected" * connected
