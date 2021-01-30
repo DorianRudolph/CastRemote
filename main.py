@@ -4,6 +4,7 @@ from kivy.storage.dictstore import DictStore
 from kivy.uix.screenmanager import Screen
 from kivy.properties import StringProperty, ObjectProperty
 from kivy.core.window import Window
+from kivy.clock import Clock
 
 from kivymd.app import MDApp
 from kivymd.uix.list import TwoLineIconListItem
@@ -15,9 +16,10 @@ import zeroconf
 KV = '''
 # kv_start
     
-<Item>:
+<CastItem>:
     on_release: app.select_cast(self.device)
-    
+    text: self.device[3]
+    secondary_text: self.device[2]
     IconLeftWidget:
         icon: root.icon
 
@@ -66,7 +68,7 @@ BoxLayout:
 '''
 
 
-class Item(TwoLineIconListItem):
+class CastItem(TwoLineIconListItem):
     icon = StringProperty()
     device = ObjectProperty()
 
@@ -75,6 +77,7 @@ class Settings:
     key = "settings"
     theme = "Dark"
     last_cast = None
+    last_uuid = None
     
     
 def update_dialog_items(dialog, items):
@@ -101,6 +104,7 @@ class CastRemoteApp(MDApp):
     cast = None
     cast_status = None
     media_status = None
+    first_connect = False
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)        
@@ -111,14 +115,20 @@ class CastRemoteApp(MDApp):
 
         self.cast_listener = pychromecast.CastListener(self.update_chromecast_discovery, self.update_chromecast_discovery, self.update_chromecast_discovery)
         self.zconf = zeroconf.Zeroconf()
+        self.browser = pychromecast.start_discovery(self.cast_listener, self.zconf)
 
     def update_chromecast_discovery(self, *args):
         self.cast_dialog_items = [
-            Item(text=device[3], secondary_text=device[2], device=device, icon="monitor")
+            CastItem(device=device, icon="monitor")
             for device in self.cast_listener.devices
         ]
         self.cast_dialog_items.sort(key=lambda i: i.text)
-        update_dialog_items(self.cast_dialog, self.cast_dialog_items)
+        if not self.cast and self.settings.last_uuid and not self.first_connect:
+            devices = [dev for dev in self.cast_listener.devices if dev[1] == self.settings.last_uuid]
+            if devices:
+                self.select_cast(devices[0])
+        if self.cast_dialog:
+            update_dialog_items(self.cast_dialog, self.cast_dialog_items)
 
     def build(self):
         return self.screen
@@ -140,12 +150,16 @@ class CastRemoteApp(MDApp):
     def show_select_dialog(self):
         if not self.cast_dialog:
             self.cast_dialog = MDDialog(title="Select Chromecast", type="simple", on_dismiss=self.cast_dialog_dismiss)
+        if self.cast_dialog_items:
+            update_dialog_items(self.cast_dialog, self.cast_dialog_items)
         self.cast_dialog.open()
-        self.browser = pychromecast.start_discovery(self.cast_listener, self.zconf)
-        
+        if not self.browser:
+            self.browser = pychromecast.start_discovery(self.cast_listener, self.zconf)
+
     def select_cast(self, device):
         print(device)
-        self.cast_dialog.dismiss()
+        if self.cast_dialog:
+            self.cast_dialog.dismiss()
         if self.cast:
             if self.cast.device.uuid == device[1]:
                 print("already connected")
@@ -161,9 +175,14 @@ class CastRemoteApp(MDApp):
         self.cast.register_status_listener(self)
         self.cast.start()
 
+        self.first_connect = True
+        self.settings.last_uuid = self.cast.uuid
+        self.save()
+
     def cast_dialog_dismiss(self, *args):
         print("dismissed dialog")
         pychromecast.stop_discovery(self.browser)
+        self.browser = None
         
     def new_media_status(self, status):
         self.media_status = status
