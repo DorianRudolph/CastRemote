@@ -27,17 +27,27 @@ KV = r'''
 
 BoxLayout:
     orientation: "vertical"
-    spacing: "10dp"
     
     MDToolbar:
         title: "Cast Remote"
         id: toolbar
         right_action_items: [["cast", lambda x: app.show_select_dialog()], ["brightness-6", lambda x: app.switch_theme_style()]]
-        
+    
+    MDSlider:
+        id: seek_slider
+        min: 0
+        max: 100
+        value: 0
+        size_hint: 1, None
+        height: "32sp"
+        hint: False
+        pos_hint: {'center_y': 0.5}
+        on_active: if not self.active: app.seek(self.value)
+    
     BoxLayout:
         height: self.minimum_height
         size_hint: 1, None
-        # spacing: "10dp"
+        
         MDIconButton:
             icon: "play"
             id: play_button
@@ -46,33 +56,40 @@ BoxLayout:
             on_press: app.play_pause()
         MDLabel:
             id: time_label
-            size_hint: None, None
-            size: self.texture_size
-            pos_hint: {'center_y': 0.5}
-        MDSlider:
-            id: seek_slider
-            min: 0
-            max: 100
-            value: 0
             size_hint: 1, None
-            height: "32sp"
-            hint: False
+            #size: self.texture_size
+            height: self.texture_size[1]
             pos_hint: {'center_y': 0.5}
-            on_active: if not self.active: app.seek(self.value)
         MDIconButton:
             id: stop_button
             icon: "stop"
-            pos_hint: {'center_y': 0.5}
+            pos_hint: {'center_y': 0.5, 'center_x': 1}
             user_font_size: "32sp"
             on_press: app.stop_button()
+            
+    BoxLayout:
+        height: self.minimum_height
+        size_hint: 1, None
+        
+        MDIconButton:
+            icon: "volume_high"
+            id: mute_button
+            pos_hint: {'center_y': 0.5}
+            user_font_size: "32sp"
+            height: "1dp"
+            on_press: app.mute()
 
-
-        # MDLabel:
-        #     height: "10dp"
-        #     text: "12:01:12"
+        MDSlider:
+            id: volume_slider
+            min: 0
+            max: 100
+            value: 100
+            size_hint: 1, None
+            height: "32sp"
+            pos_hint: {'center_y': 0.5}
+            on_active: if not self.active: app.set_volume(self.value)
          
     ScrollView:
-        
         GridLayout:
             cols: 1
             adaptive_size: True
@@ -236,6 +253,12 @@ class CastRemoteApp(MDApp):
         self.update_state()
         print("cast status", status)
         
+    def mute(self):
+        self.cast.set_volume_muted(not self.cast_status.volume_muted)     
+        
+    def set_volume(self, volume):
+        self.cast.set_volume(volume/100)
+        
     def play_pause(self, *args):
         if self.is_playing:
             self.cast.media_controller.pause()
@@ -254,10 +277,13 @@ class CastRemoteApp(MDApp):
         else:
             status_text = "No Connection"
 
-        play_button = self.screen.ids.play_button
-        stop_button = self.screen.ids.stop_button
-        seek_slider = self.screen.ids.seek_slider
-        time_label = self.screen.ids.time_label
+        ids = self.screen.ids
+        play_button = ids.play_button
+        stop_button = ids.stop_button
+        seek_slider = ids.seek_slider
+        time_label = ids.time_label
+        mute_button = ids.mute_button
+        volume_slider = ids.volume_slider
 
         if cs := self.cast_status:
             status_text += f"""
@@ -266,6 +292,17 @@ display_name: {cs.display_name}
 status_text: {cs.status_text}
 is_stand_by: {cs.is_stand_by}
 is_active_input: {cs.is_active_input}"""
+            mute_button.icon = ("volume-mute" if cs.volume_muted else
+                                "volume-high" if cs.volume_level > 0.66 else
+                                "volume-medium" if cs.volume_level > 0.33 else
+                                "volume-low")
+            if not volume_slider.active:
+                volume_slider.value = cs.volume_level * 100
+            mute_button.disabled = False
+            volume_slider.disabled = False
+        else:
+            mute_button.disabled = True
+            volume_slider.disabled = True
         if ms := self.media_status:
             status_text += f"""
 title: {ms.title}
@@ -275,17 +312,18 @@ time: {ms.adjusted_current_time}/{ms.duration}
 rate: {ms.playback_rate}
 player_state: {ms.player_state}
 supports:{' pause' * ms.supports_pause + ' seek' * ms.supports_seek + ' playback_rate' * ms.supports_playback_rate}"""
+
             self.is_playing = ms.player_state != MEDIA_PLAYER_STATE_PAUSED
             play_button.icon = ["play", "pause"][self.is_playing]
             play_button.disabled = not ms.supports_pause
+
             seek_slider.max = int(max(ms.adjusted_current_time, ms.duration or 0))
-            
             if not seek_slider.active:
                 seek_slider.value = int(ms.adjusted_current_time)
 
             seek_slider.disabled = not ms.supports_seek
-            time_label.text_size = None, None
-            time_label.text = f"{format_time(ms.adjusted_current_time)} / {format_time(ms.duration) if ms.duration else '-'}"
+            #time_label.text_size = None, None
+            time_label.text = f"{format_time(ms.adjusted_current_time)} / {format_time(ms.duration) if ms.duration else '-'}  •  {ms.title}"
             stop_button.disabled = False
         else:
             play_button.icon = "play"

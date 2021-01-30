@@ -1,0 +1,10 @@
+            canvas.before:
+                Color:
+                    rgba: 0.5, 0.5, 0.5, 1
+                Rectangle:
+                    size: self.size
+                    pos: self.pos
+
+
+            #size: self.texture_size
+            #time_label.text_size = None, None

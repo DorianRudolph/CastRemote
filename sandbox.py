@@ -1,0 +1,13 @@
+{'metadata_type': 0, 'title': 'Light Entertainment - Rack-mountable Spectrum Analyser & DB Meter', 'series_title': None,
+ 'season': None, 'episode': None, 'artist': None, 'album_name': None, 'album_artist': None, 'track': None,
+ 'subtitle_tracks': {},
+ 'images': [MediaImage(url='https://i.ytimg.com/vi/CKvP4GjoLZc/hqdefault.jpg', height=None, width=None)],
+ 'supports_pause': True, 'supports_seek': True, 'supports_stream_volume': False, 'supports_stream_mute': False,
+ 'supports_skip_forward': False, 'supports_skip_backward': False, 'supports_playback_rate': False,
+ 'current_time': 462.28, 'content_id': 'CKvP4GjoLZc', 'content_type': 'x-youtube/video', 'duration': 561.361,
+ 'stream_type': 'BUFFERED', 'idle_reason': None, 'media_session_id': 1211475200, 'playback_rate': 1,
+ 'player_state': 'PAUSED', 'supported_media_commands': 262211, 'volume_level': 0.5, 'volume_muted': False,
+ 'media_custom_data': {},
+ 'media_metadata': {'metadataType': 0, 'title': 'Light Entertainment - Rack-mountable Spectrum Analyser & DB Meter',
+                    'subtitle': 'Techmoan', 'images': [{'url': 'https://i.ytimg.com/vi/CKvP4GjoLZc/hqdefault.jpg'}]},
+ 'current_subtitle_tracks': [], 'last_updated': datetime.datetime(2021, 1, 30, 14, 20, 46, 60831)}
