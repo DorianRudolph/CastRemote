@@ -8,6 +8,7 @@ from kivy.clock import Clock
 from kivymd.app import MDApp
 from kivymd.uix.list import TwoLineIconListItem
 from kivymd.uix.dialog import MDDialog
+from kivymd.uix.menu import MDDropdownMenu
 
 from pychromecast.controllers.media import MEDIA_PLAYER_STATE_PAUSED
 
@@ -106,6 +107,7 @@ BoxLayout:
                 text: "1.25x"
                 height: volume_slider.height
                 pos_hint: {'center_y': 0.5}
+                on_release: app.rate_menu.open()
                 
         MDSlider2:
             id: rate_slider
@@ -196,6 +198,18 @@ class CastRemoteApp(MDApp):
         print(label.text_size)
         # hack_slider(self.screen.ids.volume_slider, lambda x: f"{round(x)}%")
         # hack_slider(self.screen.ids.seek_slider, lambda x: format_time(x))
+
+        menu_items = [{"text": f"{x}x", "bot_pad": "12dp"}
+                      for x in (0.5, 0.75, 1, 1.25, 1.5, 1.75, 2)]
+        self.rate_menu = MDDropdownMenu(
+            caller=self.screen.ids.rate_dropdown,
+            items=menu_items,
+            width_mult=2)
+        self.rate_menu.bind(on_release=self.on_rate_menu)
+        
+    def on_rate_menu(self, menu, item):
+        self.set_rate(float(item.text[:-1]))
+        menu.dismiss()
 
     def update_chromecast_discovery(self, *args):
         self.cast_dialog_items = [
