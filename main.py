@@ -1,7 +1,6 @@
 from kivy.lang import Builder
 from kivy.config import Config
 from kivy.storage.dictstore import DictStore
-from kivy.uix.screenmanager import Screen
 from kivy.properties import StringProperty, ObjectProperty
 from kivy.core.window import Window
 from kivy.clock import Clock
@@ -14,9 +13,12 @@ from pychromecast.controllers.media import MEDIA_PLAYER_STATE_PAUSED
 
 import pychromecast
 import zeroconf
-import datetime
+import slider2
 
-KV = r'''    
+KV = r'''   
+
+#:import time time
+ 
 <CastItem>:
     on_release: app.select_cast(self.device)
     text: self.device[3]
@@ -33,20 +35,25 @@ BoxLayout:
         id: toolbar
         right_action_items: [["cast", lambda x: app.show_select_dialog()], ["brightness-6", lambda x: app.switch_theme_style()]]
     
-    MDSlider:
-        id: seek_slider
-        min: 0
-        max: 100
-        value: 0
+    BoxLayout:
+        height: self.minimum_height
         size_hint: 1, None
-        height: "32sp"
-        hint: False
-        pos_hint: {'center_y': 0.5}
-        on_active: if not self.active: app.seek(self.value)
+        padding: dp(10), dp(10), dp(10), 0 # ltrb
+        
+        MDSlider2:
+            id: seek_slider
+            min: 0
+            max: 100
+            value: 0
+            size_hint: 1, None
+            height: "32sp"
+            on_active: if not self.active: app.seek(self.value)
+            hint_text: app.format_time(self.value)
     
     BoxLayout:
         height: self.minimum_height
         size_hint: 1, None
+        padding: "10dp", 0
         
         MDIconButton:
             icon: "play"
@@ -57,7 +64,6 @@ BoxLayout:
         MDLabel:
             id: time_label
             size_hint: 1, None
-            #size: self.texture_size
             height: self.texture_size[1]
             pos_hint: {'center_y': 0.5}
         MDIconButton:
@@ -70,6 +76,7 @@ BoxLayout:
     BoxLayout:
         height: self.minimum_height
         size_hint: 1, None
+        padding:  dp(10), 0
         
         MDIconButton:
             icon: "volume_high"
@@ -79,7 +86,7 @@ BoxLayout:
             height: "1dp"
             on_press: app.mute()
 
-        MDSlider:
+        MDSlider2:
             id: volume_slider
             min: 0
             max: 100
@@ -88,6 +95,7 @@ BoxLayout:
             height: "32sp"
             pos_hint: {'center_y': 0.5}
             on_active: if not self.active: app.set_volume(self.value)
+            hint_text: "{:.0f}%".format(self.value)  # fstring does not trigger updates
          
     ScrollView:
         GridLayout:
@@ -135,12 +143,7 @@ def update_dialog_items(dialog, items):
         dialog.ids.scroll.height = dialog.get_normal_height()
     else:
         dialog.ids.scroll.height = height
-        
 
-def format_time(seconds):
-    s = int(seconds)
-    return f"{s//3600}:{s//60%60:02}:{s%60:02}" if s >= 3600 else f"{s//60}:{s%60:02}"
-    
 
 class CastRemoteApp(MDApp):
     cast_dialog = None
@@ -153,12 +156,17 @@ class CastRemoteApp(MDApp):
     is_playing = False
     seeking = False
 
+    @staticmethod
+    def format_time(seconds):
+        s = int(seconds)
+        return f"{s // 3600}:{s // 60 % 60:02}:{s % 60:02}" if s >= 3600 else f"{s // 60}:{s % 60:02}"
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)        
         self.settings = store.get(Settings.key)["settings"]
-        self.theme_cls.theme_style = self.settings.theme
-        
+
         self.screen = Builder.load_string(KV)
+        self.theme_cls.theme_style = self.settings.theme
         self.update_state()
 
         self.cast_listener = pychromecast.CastListener(self.update_chromecast_discovery, self.update_chromecast_discovery, self.update_chromecast_discovery)
@@ -166,6 +174,12 @@ class CastRemoteApp(MDApp):
         self.browser = pychromecast.start_discovery(self.cast_listener, self.zconf)
 
         Clock.schedule_interval(self.tick, 0.2)
+
+        label = self.screen.ids.volume_slider.ids.hint_label
+        # label.text_size = None, None
+        print(label.text_size)
+        # hack_slider(self.screen.ids.volume_slider, lambda x: f"{round(x)}%")
+        # hack_slider(self.screen.ids.seek_slider, lambda x: format_time(x))
 
     def update_chromecast_discovery(self, *args):
         self.cast_dialog_items = [
@@ -323,7 +337,7 @@ supports:{' pause' * ms.supports_pause + ' seek' * ms.supports_seek + ' playback
 
             seek_slider.disabled = not ms.supports_seek
             #time_label.text_size = None, None
-            time_label.text = f"{format_time(ms.adjusted_current_time)} / {format_time(ms.duration) if ms.duration else '-'}  •  {ms.title}"
+            time_label.text = f"{self.format_time(ms.adjusted_current_time)} / {self.format_time(ms.duration) if ms.duration else '-'}  •  {ms.title}"
             stop_button.disabled = False
         else:
             play_button.icon = "play"
