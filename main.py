@@ -109,12 +109,12 @@ BoxLayout:
                 
         MDSlider2:
             id: rate_slider
-            min: 0
-            max: 100
-            value: 100
+            min: 0.5 # https://developers.google.com/android/reference/com/google/android/gms/cast/MediaLoadOptions#PLAYBACK_RATE_MIN
+            max: 2
+            value: 1
             pos_hint: {'center_y': 0.5}
-            #on_active: if not self.active: app.set_rate(self.value)
-            #hint_text: "{:.0f}%".format(self.value)
+            on_active: if not self.active: app.set_rate(self.value)
+            hint_text: "{:.2f}%".format(self.value)
          
     ScrollView:
         GridLayout:
@@ -300,6 +300,9 @@ class CastRemoteApp(MDApp):
         
     def seek(self, pos):
         self.cast.media_controller.seek(pos)
+        
+    def set_rate(self, rate):
+        self.cast.media_controller.set_playback_rate(rate)
 
     def update_state(self):
         if self.cast:
@@ -314,6 +317,8 @@ class CastRemoteApp(MDApp):
         time_label = ids.time_label
         mute_button = ids.mute_button
         volume_slider = ids.volume_slider
+        rate_slider = ids.rate_slider
+        rate_dropdown = ids.rate_dropdown
 
         if cs := self.cast_status:
             status_text += f"""
@@ -355,11 +360,18 @@ supports:{' pause' * ms.supports_pause + ' seek' * ms.supports_seek + ' playback
             #time_label.text_size = None, None
             time_label.text = f"{self.format_time(ms.adjusted_current_time)} / {self.format_time(ms.duration) if ms.duration else '-'}  •  {ms.title}"
             stop_button.disabled = False
+
+            if not rate_slider.active:
+                rate_slider.value = ms.playback_rate
+            rate_dropdown.text = f"{ms.playback_rate:.2f}".rstrip("0").rstrip(".") + "x"
+            rate_slider.disabled = rate_dropdown.disabled = not ms.supports_playback_rate
         else:
             play_button.icon = "play"
             play_button.disabled = True
             stop_button.disabled = True
             seek_slider.disabled = True
+            rate_slider.disabled = True
+            rate_dropdown.disabled = True
             # time_label.text = "-/-"
         
         self.screen.ids.status_label.text = status_text
