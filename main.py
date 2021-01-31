@@ -38,6 +38,7 @@ BoxLayout:
     BoxLayout:
         height: self.minimum_height
         size_hint: 1, None
+        height: sp(32)
         padding: dp(10), dp(10), dp(10), 0 # ltrb
         
         MDSlider2:
@@ -45,8 +46,6 @@ BoxLayout:
             min: 0
             max: 100
             value: 0
-            size_hint: 1, None
-            height: "32sp"
             on_active: if not self.active: app.seek(self.value)
             hint_text: app.format_time(self.value)
     
@@ -73,17 +72,18 @@ BoxLayout:
             user_font_size: "32sp"
             on_press: app.stop_button()
             
-    BoxLayout:
+    GridLayout:
         height: self.minimum_height
         size_hint: 1, None
         padding:  dp(10), 0
+        cols: 2
+        row_default_height: mute_button.height
         
         MDIconButton:
             icon: "volume_high"
             id: mute_button
-            pos_hint: {'center_y': 0.5}
-            user_font_size: "32sp"
-            height: "1dp"
+            #pos_hint: {'center_y': 0.5}
+            user_font_size: sp(32)
             on_press: app.mute()
 
         MDSlider2:
@@ -91,11 +91,30 @@ BoxLayout:
             min: 0
             max: 100
             value: 100
-            size_hint: 1, None
-            height: "32sp"
             pos_hint: {'center_y': 0.5}
             on_active: if not self.active: app.set_volume(self.value)
             hint_text: "{:.0f}%".format(self.value)  # fstring does not trigger updates
+        
+        AnchorLayout:
+            anchor_x: "left"
+            anchor_y: "center"
+            width: max(mute_button.width, rate_dropdown.width)
+            size_hint_x: None
+            
+            MDDropDownItem:
+                id: rate_dropdown
+                text: "1.25x"
+                height: volume_slider.height
+                pos_hint: {'center_y': 0.5}
+                
+        MDSlider2:
+            id: rate_slider
+            min: 0
+            max: 100
+            value: 100
+            pos_hint: {'center_y': 0.5}
+            #on_active: if not self.active: app.set_rate(self.value)
+            #hint_text: "{:.0f}%".format(self.value)
          
     ScrollView:
         GridLayout:
@@ -110,9 +129,6 @@ BoxLayout:
                 id: status_label
                 height: self.texture_size[1]
                 size_hint_y: None
-
-            MDRaisedButton:    
-                text: "Hello"
 '''
 
 
