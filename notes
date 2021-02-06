@@ -8,3 +8,14 @@
 
             #size: self.texture_size
             #time_label.text_size = None, None
+
+
+
+https://dashif-documents.azurewebsites.net/Guidelines-TimingModel/master/Guidelines-TimingModel.html
+http://mp4parser.com/
+https://www.w3.org/TR/mse-byte-stream-format-webm/
+enzyme python
+
+https://testassets.dashif.org/#testvector/list
+
+https://developers.google.com/cast/docs/web_receiver/error_codes#shaka_player_error_codes

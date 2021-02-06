@@ -1,13 +1,33 @@
-{'metadata_type': 0, 'title': 'Light Entertainment - Rack-mountable Spectrum Analyser & DB Meter', 'series_title': None,
- 'season': None, 'episode': None, 'artist': None, 'album_name': None, 'album_artist': None, 'track': None,
- 'subtitle_tracks': {},
- 'images': [MediaImage(url='https://i.ytimg.com/vi/CKvP4GjoLZc/hqdefault.jpg', height=None, width=None)],
- 'supports_pause': True, 'supports_seek': True, 'supports_stream_volume': False, 'supports_stream_mute': False,
- 'supports_skip_forward': False, 'supports_skip_backward': False, 'supports_playback_rate': False,
- 'current_time': 462.28, 'content_id': 'CKvP4GjoLZc', 'content_type': 'x-youtube/video', 'duration': 561.361,
- 'stream_type': 'BUFFERED', 'idle_reason': None, 'media_session_id': 1211475200, 'playback_rate': 1,
- 'player_state': 'PAUSED', 'supported_media_commands': 262211, 'volume_level': 0.5, 'volume_muted': False,
- 'media_custom_data': {},
- 'media_metadata': {'metadataType': 0, 'title': 'Light Entertainment - Rack-mountable Spectrum Analyser & DB Meter',
-                    'subtitle': 'Techmoan', 'images': [{'url': 'https://i.ytimg.com/vi/CKvP4GjoLZc/hqdefault.jpg'}]},
- 'current_subtitle_tracks': [], 'last_updated': datetime.datetime(2021, 1, 30, 14, 20, 46, 60831)}
+import youtube_dl
+from pprint import pprint
+from pymp4.parser import MP4
+
+
+def test_ytdl():
+    # url = "https://www.youtube.com/watch?v=hjKO0d_umLc"
+    url = "https://www.youtube.com/watch?v=VC_zaUil5pQ"
+    ydl_opts = {"format": "best"}
+    with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+        result = ydl.extract_info(url, download=False)
+        pprint(result)
+        print(result["url"])
+        
+
+def test_mp4():
+    # f = "ElephantsDream_AAC48K_064.mp4.dash"
+    f = "ElephantsDream_H264BPL30_0100.264.dash"
+    # f = "video_8000k_init.mp4"
+    b = open(f, "rb").read(10000)
+    cs = MP4.parse(b)
+    for c in cs:
+        if c.type == b"sidx":
+            print(f"""<SegmentBase indexRangeExact="true" indexRange="{c.offset}-{c.end-1}">
+  <Initialization range="0-{c.offset-1}"/>
+</SegmentBase>
+            """)
+            break
+    else:
+        raise Exception("No sidx found")
+
+
+test_ytdl()

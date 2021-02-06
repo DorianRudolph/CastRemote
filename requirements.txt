@@ -1,3 +1,5 @@
 https://github.com/kivymd/KivyMD/archive/e80c6dfead1ce8e724082666f878657d4b845623.zip
 https://github.com/DorianRudolph/pychromecast/archive/dr.zip
 youtube-dl
+pymp4
+https://github.com/DorianRudolph/mpegdash/archive/master.zip
