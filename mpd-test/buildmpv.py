@@ -1,14 +1,11 @@
 import youtube_dl
 from pprint import pprint
 from pymp4.parser import MP4
-from mpegdash.mpd import MPD
-from mpegdash.period import Period
-from mpegdash.adaptation_set import AdaptationSet
-from mpegdash.representation import Representation
 from xml.sax.saxutils import escape
 from urllib.parse import urlparse
 import requests
-
+from ebmlite import loadSchema
+matroska = loadSchema('matroska.xml')
 
 def get_range(url, n=10000):
     return requests.get(url, headers={"Range": f"bytes=0-{n}"}).content
@@ -19,10 +16,17 @@ def compute_segment_base_mp4(data):
     for c in cs:
         if c.type == b"sidx":
             return c.offset, c.end - 1
-    else:
-        raise Exception("No sidx found")
+    raise Exception("No sidx found")
     
     
+def compute_segment_base_webm(data):
+    doc = matroska.loads(data)
+    for el in doc[0]:
+        if el.name == "Cues":
+            return el.offset, el.offset + el.size - 1
+    raise Exception("No Cues element found")
+
+
 def split_url(url):
     u = urlparse(url)
     assert u.params == ""
@@ -36,6 +40,8 @@ def build_representation(f, id):
     ext = f["ext"]
     if ext in ("m4a", "mp4"):
         segment = compute_segment_base_mp4(head)
+    elif ext == "webm":
+        segment = compute_segment_base_webm(head)
     else:
         raise NotImplementedError
     
@@ -61,20 +67,21 @@ def build_mpd(url, supported_codecs=("hev", "vp9", "vp8", "avc")):
     ydl_opts = {"format": "best"}
     with youtube_dl.YoutubeDL(ydl_opts) as ydl:
         result = ydl.extract_info(url, download=False)
-        
+    
+    formats = result["formats"]
     # for f in result["formats"]:
     #     print(f["format"], f["ext"])
     #     print(f["url"])
     # return
 
-    audio_formats = [f for f in result["formats"] if 
+    audio_formats = [f for f in formats if
                      f["acodec"] != "none" and 
                      f["vcodec"] == "none" and
                      f["ext"] in ("m4a", "webmm")]
     audio_formats.sort(key=lambda f: f["abr"])
     audio_format = audio_formats[-1]  # select audio format with highest bitrate
 
-    video_formats = [f for f in result["formats"] if f["acodec"] == "none" and f["vcodec"] != "none"]
+    video_formats = [f for f in formats if f["acodec"] == "none" and f["vcodec"] != "none"]
     video_formats.sort(key=lambda f: f["width"])
     video_formats_by_codec = [
         (codec, vf)
@@ -101,7 +108,7 @@ def build_mpd(url, supported_codecs=("hev", "vp9", "vp8", "avc")):
     <Title>{escape(result["title"])}</Title>
   </ProgramInformation>
 
-  <BaseURL>http://192.168.178.20:8080/p/{escape(base_urls[0])}</BaseURL>
+  <BaseURL>http://192.168.178.20:8000/{escape(base_urls[0])}</BaseURL>
   <Period>
     <AdaptationSet subsegmentAlignment="true" subsegmentStartsWithSAP="1">
 {build_representation(audio_format, 1)}
@@ -127,4 +134,4 @@ def build_mpd(url, supported_codecs=("hev", "vp9", "vp8", "avc")):
     print(result["url"])
 
 
-print(build_mpd("https://www.youtube.com/watch?v=VC_zaUil5pQ", ["avc"]))
+print(build_mpd("https://www.youtube.com/watch?v=VC_zaUil5pQ"))

@@ -118,7 +118,7 @@ BoxLayout:
         AnchorLayout:
             anchor_x: "left"
             anchor_y: "center"
-            width: max(mute_button.width, rate_dropdown.width)
+            width: mute_button.width + sp(10)
             size_hint_x: None
             
             MDDropDownItem:
@@ -403,9 +403,9 @@ supports:{' pause' * ms.supports_pause + ' seek' * ms.supports_seek + ' playback
             time_label.text = f"{self.format_time(ms.adjusted_current_time)} / {self.format_time(ms.duration) if ms.duration else '-'}  •  {ms.title}"
             stop_button.disabled = False
 
-            if not rate_slider.active:
+            if not rate_slider.active and ms.playback_rate > 0:
                 rate_slider.value = ms.playback_rate
-            rate_dropdown.text = f"{ms.playback_rate:.2f}".rstrip("0").rstrip(".") + "x"
+                rate_dropdown.text = f"{ms.playback_rate:.2f}".rstrip("0").rstrip(".") + "x"
             rate_slider.disabled = rate_dropdown.disabled = not ms.supports_playback_rate
         else:
             play_button.icon = "play"
