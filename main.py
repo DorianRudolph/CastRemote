@@ -21,7 +21,7 @@ import zeroconf
 import slider2
 from ytdlhack import FixedYoutubeDL
 import youtube_dl
-from strserver import serve_async
+from strserver import serve
 import socket
 
 
@@ -258,7 +258,7 @@ class CastRemoteApp(MDApp):
         self.screen.ids.resolution_dropdown.text = f"{self.max_resolution}p"
         
         self.serve_files = {}
-        self.serv_thread = serve_async(self.serve_files, PORT)
+        self.server_thread, self.server = serve(self.serve_files, PORT)
 
     def on_rate_menu(self, menu, item):
         self.set_rate(float(item.text[:-1]))
@@ -291,6 +291,7 @@ class CastRemoteApp(MDApp):
 
     def on_stop(self):
         self.save()
+        self.server.shutdown()
 
     def on_pause(self):
         self.save()

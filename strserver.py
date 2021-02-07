@@ -19,27 +19,19 @@ class Handler(BaseHTTPRequestHandler):
             self.send_response(404)
         
     def do_GET(self):
-        print("GET", self.path)
+        # print("GET", self.path)
         self._get(False)
         
     def do_HEAD(self):
-        print("HEAD", self.path)
+        # print("HEAD", self.path)
         self._get(True)
-            
 
+    
 def serve(files, port):
+    def forever():
+        httpd.serve_forever(poll_interval=0.1)
+        httpd.server_close()
     httpd = HTTPServer(("", port), lambda *args, **kwargs: Handler(files, *args, **kwargs))
-    try:
-        httpd.serve_forever()
-    except KeyboardInterrupt:
-        pass
-    httpd.server_close()
-    
-    
-def serve_async(files, port):
-    t = Thread(target=serve, args=(files, port))
+    t = Thread(target=forever)
     t.start()
-    return t
-
-
-#run({"a": (open("mpd-test/test.mpd").read(), "application/dash+xml")})
+    return t, httpd
