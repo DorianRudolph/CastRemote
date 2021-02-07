@@ -39,8 +39,27 @@ BoxLayout:
     BoxLayout:
         height: self.minimum_height
         size_hint: 1, None
+        padding: dp(25), dp(10), dp(10), 0 # ltrb
+        spacing: dp(10)
+                
+        MDTextField:
+            id: url_text_field
+            hint_text: "Cast URL"
+        
+        MDIconButton:
+            icon: "delete"
+            on_release: url_text_field.text = ""
+            
+        MDIconButton:
+            icon: "send"
+            on_release: app.cast_url(url_text_field.text)
+
+    
+    BoxLayout:
+        height: self.minimum_height
+        size_hint: 1, None
         height: sp(32)
-        padding: dp(10), dp(10), dp(10), 0 # ltrb
+        padding: dp(10), 0 # hv
         
         MDSlider2:
             id: seek_slider
@@ -144,6 +163,7 @@ class Settings:
     theme = "Dark"
     last_cast = None
     last_uuid = None
+    last_url = None
     
     
 def update_dialog_items(dialog, items):
@@ -206,7 +226,9 @@ class CastRemoteApp(MDApp):
             items=menu_items,
             width_mult=2)
         self.rate_menu.bind(on_release=self.on_rate_menu)
-        
+
+        self.screen.ids.url_text_field.text = self.settings.last_url or ""
+
     def on_rate_menu(self, menu, item):
         self.set_rate(float(item.text[:-1]))
         menu.dismiss()
@@ -236,6 +258,12 @@ class CastRemoteApp(MDApp):
     def on_pause(self):
         self.save()
         return True
+    
+    def cast_url(self, url):
+        self.settings.last_url = url
+        self.save()
+        if not url:
+            return
 
     def save(self):
         store.put(Settings.key, settings=self.settings)
@@ -389,9 +417,6 @@ supports:{' pause' * ms.supports_pause + ' seek' * ms.supports_seek + ' playback
             # time_label.text = "-/-"
         
         self.screen.ids.status_label.text = status_text
-        
-
-
 
     def set_cast_icon(self, connected):
         self.screen.ids.toolbar.ids.right_actions.children[1].icon = "cast" + "-connected" * connected
