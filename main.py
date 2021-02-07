@@ -39,8 +39,14 @@ BoxLayout:
     BoxLayout:
         height: self.minimum_height
         size_hint: 1, None
-        padding: dp(25), dp(10), dp(10), 0 # ltrb
+        padding: dp(10), dp(10), dp(10), 0 # ltrb
         spacing: dp(10)
+        
+        MDDropDownItem:
+            id: resolution_dropdown
+            text: "2160p"
+            pos_hint: {'center_y': 0.5}
+            on_release: app.resolution_menu.open()
                 
         MDTextField:
             id: url_text_field
@@ -193,6 +199,7 @@ class CastRemoteApp(MDApp):
     first_connect = False
     is_playing = False
     seeking = False
+    max_resolution = 2160
 
     @staticmethod
     def format_time(seconds):
@@ -219,18 +226,29 @@ class CastRemoteApp(MDApp):
         # hack_slider(self.screen.ids.volume_slider, lambda x: f"{round(x)}%")
         # hack_slider(self.screen.ids.seek_slider, lambda x: format_time(x))
 
-        menu_items = [{"text": f"{x}x", "bot_pad": "12dp"}
-                      for x in (0.5, 0.75, 1, 1.25, 1.5, 1.75, 2)]
         self.rate_menu = MDDropdownMenu(
             caller=self.screen.ids.rate_dropdown,
-            items=menu_items,
+            items=[{"text": f"{x}x", "bot_pad": "12dp"}
+                   for x in (0.5, 0.75, 1, 1.25, 1.5, 1.75, 2)],
             width_mult=2)
         self.rate_menu.bind(on_release=self.on_rate_menu)
+
+        self.resolution_menu = MDDropdownMenu(
+            caller=self.screen.ids.resolution_dropdown,
+            items=[{"text": f"{x}p", "bot_pad": "12dp"}
+                   for x in (2160, 1440, 1080, 720, 480, 360, 240, 144)],
+            width_mult=2)
+        self.resolution_menu.bind(on_release=self.on_resolution_menu)
 
         self.screen.ids.url_text_field.text = self.settings.last_url or ""
 
     def on_rate_menu(self, menu, item):
         self.set_rate(float(item.text[:-1]))
+        menu.dismiss()
+        
+    def on_resolution_menu(self, menu, item):
+        self.max_resolution = int(item.text[:-1])
+        self.screen.ids.resolution_dropdown.text = item.text
         menu.dismiss()
 
     def update_chromecast_discovery(self, *args):

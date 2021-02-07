@@ -7,6 +7,7 @@ import requests
 from ebmlite import loadSchema
 matroska = loadSchema('matroska.xml')
 
+
 def get_range(url, n=10000):
     return requests.get(url, headers={"Range": f"bytes=0-{n}"}).content
 
@@ -63,7 +64,7 @@ def build_representation(f, id):
       </Representation>"""
 
 
-def build_mpd(url, supported_codecs=("hev", "vp9", "vp8", "avc")):
+def build_mpd(url, cors_proxy, supported_codecs=("hev", "vp9", "vp8", "avc")):
     ydl_opts = {"format": "best"}
     with youtube_dl.YoutubeDL(ydl_opts) as ydl:
         result = ydl.extract_info(url, download=False)
@@ -108,7 +109,7 @@ def build_mpd(url, supported_codecs=("hev", "vp9", "vp8", "avc")):
     <Title>{escape(result["title"])}</Title>
   </ProgramInformation>
 
-  <BaseURL>http://192.168.178.20:8000/{escape(base_urls[0])}</BaseURL>
+  <BaseURL>{escape(cors_proxy + base_urls[0])}</BaseURL>
   <Period>
     <AdaptationSet subsegmentAlignment="true" subsegmentStartsWithSAP="1">
 {build_representation(audio_format, 1)}
@@ -134,4 +135,4 @@ def build_mpd(url, supported_codecs=("hev", "vp9", "vp8", "avc")):
     print(result["url"])
 
 
-print(build_mpd("https://www.youtube.com/watch?v=VC_zaUil5pQ"))
+print(build_mpd("https://www.youtube.com/watch?v=VC_zaUil5pQ", "http://192.168.178.20:8000/"))
