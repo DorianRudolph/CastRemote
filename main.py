@@ -9,12 +9,24 @@ from kivymd.app import MDApp
 from kivymd.uix.list import TwoLineIconListItem
 from kivymd.uix.dialog import MDDialog
 from kivymd.uix.menu import MDDropdownMenu
+from kivymd.uix.snackbar import Snackbar
+from kivymd.toast import toast
 
 from pychromecast.controllers.media import MEDIA_PLAYER_STATE_PAUSED
+
+from ytmpd import build_mpd, CODECS, format_mime
 
 import pychromecast
 import zeroconf
 import slider2
+from ytdlhack import FixedYoutubeDL
+import youtube_dl
+from strserver import serve_async
+import socket
+
+
+CORS_PROXY = "http://192.168.178.20:8000/"
+PORT = 47080
 
 KV = r'''   
 
@@ -170,6 +182,7 @@ class Settings:
     last_cast = None
     last_uuid = None
     last_url = None
+    last_resolution = None
     
     
 def update_dialog_items(dialog, items):
@@ -241,13 +254,19 @@ class CastRemoteApp(MDApp):
         self.resolution_menu.bind(on_release=self.on_resolution_menu)
 
         self.screen.ids.url_text_field.text = self.settings.last_url or ""
+        self.max_resolution = self.settings.last_resolution or 2160
+        self.screen.ids.resolution_dropdown.text = f"{self.max_resolution}p"
+        
+        self.serve_files = {}
+        self.serv_thread = serve_async(self.serve_files, PORT)
 
     def on_rate_menu(self, menu, item):
         self.set_rate(float(item.text[:-1]))
         menu.dismiss()
         
     def on_resolution_menu(self, menu, item):
-        self.max_resolution = int(item.text[:-1])
+        self.settings.last_resolution = self.max_resolution = int(item.text[:-1])
+        self.save()
         self.screen.ids.resolution_dropdown.text = item.text
         menu.dismiss()
 
@@ -282,6 +301,33 @@ class CastRemoteApp(MDApp):
         self.save()
         if not url:
             return
+
+        ydl_opts = {"format": "best"}
+        try:
+            with FixedYoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+        except youtube_dl.utils.YoutubeDLError as e:
+            print(e)
+            Snackbar(text=f"Exception: {e}").open()
+            
+        codecs = ("vp8", "avc") if self.cast.model_name == "Chromecast" else CODECS  # TODO match https://developers.google.com/cast/docs/media
+        cast_url = info["url"]
+        mime = format_mime(info)
+        if info["vcodec"] != "none":
+            best_height = max(f["height"] for f in info["formats"] if any(c.startswith(f["vcodec"]) for c in codecs))
+            if info["height"] < best_height:
+                try:
+                    mpd = build_mpd(info, CORS_PROXY, codecs, self.max_resolution)
+                    mime = "application/dash+xml"
+                    cast_url = f"http://{self.cast.socket_client.socket.getsockname()[0]}:{PORT}/mpd"
+                    self.serve_files["mpd"] = (mpd, mime)
+                except Exception as e:
+                    print(e)
+                    Snackbar(text=f"MPD exception, fallback to URL: {e}")
+        
+        title = info["title"]
+        toast("Casting: " + title)
+        self.cast.media_controller.play_media(cast_url, mime, title)
 
     def save(self):
         store.put(Settings.key, settings=self.settings)
