@@ -3,5 +3,5 @@ https://github.com/DorianRudolph/pychromecast/archive/dr.zip
 youtube-dl
 pymp4==1.2.*
 requests
-ebmlite == 3.0.*
+ebmlite==3.0.*
 

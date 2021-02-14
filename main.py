@@ -70,6 +70,7 @@ BoxLayout:
             
         MDIconButton:
             icon: "send"
+            id: send_button
             on_release: app.cast_url(url_text_field.text)
 
     
@@ -118,7 +119,7 @@ BoxLayout:
         row_default_height: mute_button.height
         
         MDIconButton:
-            icon: "volume_high"
+            icon: "volume-high"
             id: mute_button
             #pos_hint: {'center_y': 0.5}
             user_font_size: sp(32)
@@ -223,6 +224,7 @@ class CastRemoteApp(MDApp):
         super().__init__(**kwargs)        
         self.settings = store.get(Settings.key)["settings"]
 
+        self.theme_cls.theme_style = self.settings.theme
         self.screen = Builder.load_string(KV)
         self.theme_cls.theme_style = self.settings.theme
         self.update_state()
@@ -426,6 +428,7 @@ class CastRemoteApp(MDApp):
         volume_slider = ids.volume_slider
         rate_slider = ids.rate_slider
         rate_dropdown = ids.rate_dropdown
+        send_button = ids.send_button
 
         if cs := self.cast_status:
             status_text += f"""
@@ -442,9 +445,11 @@ is_active_input: {cs.is_active_input}"""
                 volume_slider.value = cs.volume_level * 100
             mute_button.disabled = False
             volume_slider.disabled = False
+            send_button.disabled = False
         else:
             mute_button.disabled = True
             volume_slider.disabled = True
+            send_button.disabled = True
         if ms := self.media_status:
             status_text += f"""
 title: {ms.title}
