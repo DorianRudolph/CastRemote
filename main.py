@@ -55,6 +55,15 @@ BoxLayout:
         height: self.minimum_height
         size_hint: 1, None
         padding: dp(10), dp(10), dp(10), 0 # ltrb
+
+        MDTextField:
+            id: url_text_field
+            hint_text: "Cast URL"
+
+    BoxLayout:
+        height: self.minimum_height
+        size_hint: 1, None
+        padding: dp(10), 0, dp(10), 0 # ltrb
         spacing: dp(10)
 
         MDDropDownItem:
@@ -62,10 +71,16 @@ BoxLayout:
             text: "2160p"
             pos_hint: {'center_y': 0.5}
             on_release: app.resolution_menu.open()
-
-        MDTextField:
-            id: url_text_field
-            hint_text: "Cast URL"
+            
+        MDDropDownItem:
+            id: format_dropdown
+            text: "auto"
+            pos_hint: {'center_y': 0.5}
+            on_release: app.format_menu.open()
+            
+        Label:
+            size_hint: 1, None
+            height: 0
 
         MDIconButton:
             icon: "delete"
@@ -90,6 +105,14 @@ BoxLayout:
             value: 0
             on_active: if not self.active: app.seek(self.value)
             hint_text: app.format_time(self.value)
+            show_off: False
+            
+    MDLabel:
+        id: time_label
+        size_hint: 1, None
+        height: self.texture_size[1]
+        pos_hint: {'center_y': 0.5}
+        padding: "10dp", "10dp"
 
     BoxLayout:
         height: self.minimum_height
@@ -102,11 +125,25 @@ BoxLayout:
             pos_hint: {'center_y': 0.5}
             user_font_size: "32sp"
             on_press: app.play_pause()
-        MDLabel:
-            id: time_label
-            size_hint: 1, None
-            height: self.texture_size[1]
+            
+        MDIconButton:
+            icon: "rewind-10"
             pos_hint: {'center_y': 0.5}
+            user_font_size: "32sp"
+            on_press: app.skip(-10)
+            disabled: seek_slider.disabled
+            
+        MDIconButton:
+            icon: "fast-forward-10"
+            pos_hint: {'center_y': 0.5}
+            user_font_size: "32sp"
+            on_press: app.skip(10)
+            disabled: seek_slider.disabled
+            
+        Label:
+            size_hint: 1, None
+            height: 0
+
         MDIconButton:
             id: stop_button
             icon: "stop"
@@ -136,6 +173,7 @@ BoxLayout:
             pos_hint: {'center_y': 0.5}
             on_active: if not self.active: app.set_volume(self.value)
             hint_text: "{:.0f}%".format(self.value)  # fstring does not trigger updates
+            show_off: False
 
         AnchorLayout:
             anchor_x: "left"
@@ -158,6 +196,7 @@ BoxLayout:
             pos_hint: {'center_y': 0.5}
             on_active: if not self.active: app.set_rate(self.value)
             hint_text: "{:.2f}%".format(self.value)
+            show_off: False
 
     ScrollView:
         GridLayout:
@@ -187,6 +226,7 @@ class Settings:
     last_uuid = None
     last_url = None
     last_resolution = None
+    last_format = None
 
 
 def update_dialog_items(dialog, items):
@@ -206,15 +246,17 @@ def update_dialog_items(dialog, items):
         dialog.ids.scroll.height = height
 
 
-def debounce(f, wait=0.5):  # somehow necessary for android :/
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        nonlocal last_call
-        if (t := time.time()) - last_call >= wait:
-            last_call = t
-            f(*args, **kwargs)
-    last_call = 0
-    return wrapper
+def debounce(wait=0.5):  # somehow necessary for android :/
+    def decorator(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            nonlocal last_call
+            if (t := time.time()) - last_call >= wait:
+                last_call = t
+                f(*args, **kwargs)
+        last_call = 0
+        return wrapper
+    return decorator
 
 
 class CastRemoteApp(MDApp):
@@ -228,6 +270,7 @@ class CastRemoteApp(MDApp):
     is_playing = False
     seeking = False
     max_resolution = 2160
+    skip_sum = 0
 
     @staticmethod
     def format_time(seconds):
@@ -265,9 +308,17 @@ class CastRemoteApp(MDApp):
             width_mult=4,
             callback=self.on_resolution_menu)
 
+        self.format_menu = MDDropdownMenu(
+            caller=self.screen.ids.format_dropdown,
+            items=[{"text": x}
+                   for x in ("auto", "vp9", "vp8", "hev", "avc")],
+            width_mult=4,
+            callback=self.on_format_menu)
+
         self.screen.ids.url_text_field.text = self.settings.last_url or ""
         self.max_resolution = self.settings.last_resolution or 2160
         self.screen.ids.resolution_dropdown.text = f"{self.max_resolution}p"
+        self.screen.ids.format_dropdown.text = self.settings.last_format or "auto"
 
         self.serve_files = {}
         self.server_thread, self.server = serve(self.serve_files, PORT)
@@ -298,6 +349,11 @@ class CastRemoteApp(MDApp):
         self.save()
         self.screen.ids.resolution_dropdown.text = item.text
         self.resolution_menu.dismiss()
+        
+    def on_format_menu(self, item):
+        self.screen.ids.format_dropdown.text = self.settings.last_format = item.text
+        self.save()
+        self.format_menu.dismiss()
 
     def update_chromecast_discovery(self, *args):
         self.cast_dialog_items = [
@@ -341,13 +397,14 @@ class CastRemoteApp(MDApp):
             Snackbar(text=f"Exception: {e}").show()
             return
 
-        codecs = ("vp8",
-                  "avc") if self.cast.model_name == "Chromecast" else CODECS  # TODO match https://developers.google.com/cast/docs/media
+        # TODO match https://developers.google.com/cast/docs/media
+        codecs = (c,) if (c := self.screen.ids.format_dropdown.text) != "auto" else \
+            ("vp8", "avc") if self.cast.model_name == "Chromecast" else CODECS
         cast_url = info["url"]
         mime = format_mime(info)
         if info["vcodec"] != "none":
             if (heights := [f["height"] for f in info["formats"] if any(f["vcodec"].startswith(c) for c in codecs)]) \
-                    and info["height"] < max(heights):
+                    and min(info["height"], self.max_resolution) < max(heights):
                 try:
                     mpd = build_mpd(info, CORS_PROXY, codecs, self.max_resolution)
                     mime = "application/dash+xml"
@@ -356,6 +413,8 @@ class CastRemoteApp(MDApp):
                 except Exception as e:
                     print(e)
                     Snackbar(text=f"MPD exception, fallback to URL: {e}").show()
+            else:
+                Snackbar(text=f"Fallback to URL").show()
 
         title = info["title"]
         toast("Casting: " + title)
@@ -364,13 +423,13 @@ class CastRemoteApp(MDApp):
     def save(self):
         store.put(Settings.key, settings=self.settings)
 
-    @debounce
+    @debounce()
     def switch_theme_style(self):
         self.theme_cls.theme_style = self.settings.theme = \
             "Light" if self.settings.theme == "Dark" else "Dark"
         print('New theme', self.theme_cls.theme_style)
 
-    @debounce
+    @debounce()
     def show_select_dialog(self):
         if not self.cast_dialog:
             self.cast_dialog = MDDialog(title="Select Chromecast", type="simple", on_dismiss=self.cast_dialog_dismiss)
@@ -406,7 +465,7 @@ class CastRemoteApp(MDApp):
 
         self.update_state()
 
-    @debounce
+    @debounce()
     def cast_dialog_dismiss(self, *args):
         print("dismissed dialog")
         pychromecast.stop_discovery(self.browser)
@@ -415,6 +474,7 @@ class CastRemoteApp(MDApp):
     def new_media_status(self, status):
         self.media_status = status
         self.update_state()
+        self.skip_sum = 0
         print("media status", status)
 
     def new_cast_status(self, status):
@@ -425,22 +485,31 @@ class CastRemoteApp(MDApp):
         self.update_state()
         print("cast status", status)
 
+    @debounce()
     def mute(self):
         self.cast.set_volume_muted(not self.cast_status.volume_muted)
 
     def set_volume(self, volume):
         self.cast.set_volume(volume / 100)
 
+    @debounce()
     def play_pause(self, *args):
         if self.is_playing:
             self.cast.media_controller.pause()
         else:
             self.cast.media_controller.play()
 
+    @debounce()
     def stop_button(self):
         self.cast.media_controller.stop()
 
     def seek(self, pos):
+        self.cast.media_controller.seek(pos)
+
+    @debounce(0.05)
+    def skip(self, delta):
+        self.skip_sum += delta
+        pos = max(0, min(self.media_status.adjusted_current_time + self.skip_sum, self.media_status.duration))
         self.cast.media_controller.seek(pos)
 
     def set_rate(self, rate):

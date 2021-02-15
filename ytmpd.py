@@ -90,6 +90,10 @@ def build_mpd(info, cors_proxy, supported_codecs=CODECS, max_height=100000):
     video_formats_by_codec.sort(key=lambda x: x[1][-1]["width"])
     video_formats = video_formats_by_codec[-1][1]
     
+    print("Audio format: ", audio_format["acodec"], audio_format["abr"])
+    print("Video format: ", video_formats[0]["vcodec"])
+
+    
     if not video_formats:
         raise Exception("no supported video formats found")
     if not audio_format:
