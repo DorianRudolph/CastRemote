@@ -557,7 +557,7 @@ is_active_input: {cs.is_active_input}"""
 title: {ms.title}
 subtitle: {0}
 supports:{' pause' * ms.supports_pause + ' seek' * ms.supports_seek + ' playback_rate' * ms.supports_playback_rate}
-time: {ms.adjusted_current_time}/{ms.duration}
+time: {ms.adjusted_current_time:.02f}/{ms.duration:.02f}
 rate: {ms.playback_rate}
 player_state: {ms.player_state}
 supports:{' pause' * ms.supports_pause + ' seek' * ms.supports_seek + ' playback_rate' * ms.supports_playback_rate}"""
