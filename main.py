@@ -4,6 +4,7 @@ from kivy.storage.dictstore import DictStore
 from kivy.properties import StringProperty, ObjectProperty
 from kivy.core.window import Window
 from kivy.clock import Clock
+from kivy.utils import platform
 
 from kivymd.app import MDApp
 from kivymd.uix.list import TwoLineIconListItem
@@ -25,6 +26,10 @@ from strserver import serve
 import time
 from functools import wraps
 from config import *
+
+if platform == "android":
+    import android
+    import android.activity
 
 KV = r'''   
 
@@ -266,6 +271,23 @@ class CastRemoteApp(MDApp):
 
         self.serve_files = {}
         self.server_thread, self.server = serve(self.serve_files, PORT)
+        
+        if platform == "android":
+            print("on_new_intent: Binding...")
+            android.activity.bind(on_new_intent=self.on_new_intent)
+            
+    def on_new_intent(self, intent):
+        try:
+            uri = intent.getStringExtra("android.intent.extra.TEXT")
+            print("on_new_intent: [shared text] {}".format(uri))
+        except Exception as e:
+            uri = None
+            print("on_new_intent: Error", e)
+        if not uri:
+            print("on_new_intent: No URI found.")
+        else:
+            print("on_new_intent: Found '{}'.".format(uri))
+            self.screen.ids.url_text_field.text = uri
 
     def on_rate_menu(self, item):
         self.set_rate(float(item.text[:-1]))
