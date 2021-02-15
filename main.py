@@ -24,9 +24,7 @@ import youtube_dl
 from strserver import serve
 import time
 from functools import wraps
-
-CORS_PROXY = "http://192.168.178.20:8000/"
-PORT = 47080
+from config import *
 
 KV = r'''   
 
@@ -142,7 +140,7 @@ BoxLayout:
 
             MDDropDownItem:
                 id: rate_dropdown
-                text: "1.25x"
+                text: "1x"
                 height: volume_slider.height
                 pos_hint: {'center_y': 0.5}
                 on_release: app.rate_menu.open()
