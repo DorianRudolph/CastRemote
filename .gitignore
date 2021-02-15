@@ -4,3 +4,5 @@
 *.pickle
 /bin/
 *.jks
+config.py
+*.bak
