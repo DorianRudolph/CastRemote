@@ -36,9 +36,7 @@ version = 0.1
 
 # (list) Application requirements
 # comma separated e.g. requirements = sqlite3,kivy
-#requirements = "python3,kivy==2.0.0,https://github.com/kivymd/KivyMD/archive/e80c6dfead1ce8e724082666f878657d4b845623.zip,https://github.com/DorianRudolph/pychromecast/archive/dr.zip,youtube-dl==2021.2.4.1,pymp4==1.2.0,requests,ebmlite==3.0.1,zeroconf==0.28.8"
-#requirements = "python3,https://github.com/kivymd/KivyMD/archive/e80c6dfead1ce8e724082666f878657d4b845623.zip,https://github.com/DorianRudolph/pychromecast/archive/dr.zip,casttube==0.2.1,certifi==2020.12.5,chardet==4.0.0,construct==2.8.8,docutils==0.16,ebmlite==3.0.1,idna==2.10,ifaddr==0.1.7,Kivy==2.0.0,Kivy-Garden==0.1.4,protobuf==3.14.0,Pygments==2.7.4,pymp4==1.2.0,requests==2.25.1,six==1.15.0,urllib3==1.26.3,youtube-dl==2021.2.4.1,zeroconf==0.28.8"
-requirements = "python3,kivy==2.0.0,casttube==0.2.1,certifi==2020.12.5,chardet==4.0.0,construct==2.8.8,docutils==0.16,ebmlite==3.0.1,idna==2.10,ifaddr==0.1.7,kivy-garden==0.1.4,https://github.com/kivymd/KivyMD/archive/e80c6dfead1ce8e724082666f878657d4b845623.zip,protobuf==3.14.0,https://github.com/DorianRudolph/pychromecast/archive/dr.zip,Pygments==2.7.4,pymp4==1.2.0,requests==2.25.1,six==1.15.0,urllib3==1.26.3,youtube-dl==2021.2.4.1,zeroconf==0.28.8"
+requirements = python3,kivy==2.0.0,kivymd==0.104.1,youtube-dl==2021.2.10,https://github.com/DorianRudolph/pychromecast/archive/dr.zip,pymp4==1.2.0,ebmlite==3.0.1,zeroconf==0.28.8,requests==2.25.1,urllib3==1.26.3,six==1.15.0,idna==2.10,ifaddr==0.1.7,chardet==4.0.0,casttube==0.2.1,protobuf==3.14.0,construct==2.8.8,certifi==2020.12.5
 
 # (str) Custom source folders for requirements
 # Sets custom source for any requirements with recipes

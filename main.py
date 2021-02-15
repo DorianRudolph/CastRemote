@@ -22,8 +22,8 @@ import slider2
 from ytdlhack import FixedYoutubeDL
 import youtube_dl
 from strserver import serve
-import socket
-
+import time
+from functools import wraps
 
 CORS_PROXY = "http://192.168.178.20:8000/"
 PORT = 47080
@@ -31,7 +31,7 @@ PORT = 47080
 KV = r'''   
 
 #:import time time
- 
+
 <CastItem>:
     on_release: app.select_cast(self.device)
     text: self.device[3]
@@ -42,44 +42,44 @@ KV = r'''
 
 BoxLayout:
     orientation: "vertical"
-    
+
     MDToolbar:
         title: "Cast Remote"
         id: toolbar
         right_action_items: [["cast", lambda x: app.show_select_dialog()], ["brightness-6", lambda x: app.switch_theme_style()]]
-    
+
     BoxLayout:
         height: self.minimum_height
         size_hint: 1, None
         padding: dp(10), dp(10), dp(10), 0 # ltrb
         spacing: dp(10)
-        
+
         MDDropDownItem:
             id: resolution_dropdown
             text: "2160p"
             pos_hint: {'center_y': 0.5}
             on_release: app.resolution_menu.open()
-                
+
         MDTextField:
             id: url_text_field
             hint_text: "Cast URL"
-        
+
         MDIconButton:
             icon: "delete"
             on_release: url_text_field.text = ""
-            
+
         MDIconButton:
             icon: "send"
             id: send_button
             on_release: app.cast_url(url_text_field.text)
 
-    
+
     BoxLayout:
         height: self.minimum_height
         size_hint: 1, None
         height: sp(32)
         padding: dp(10), 0 # hv
-        
+
         MDSlider2:
             id: seek_slider
             min: 0
@@ -87,12 +87,12 @@ BoxLayout:
             value: 0
             on_active: if not self.active: app.seek(self.value)
             hint_text: app.format_time(self.value)
-    
+
     BoxLayout:
         height: self.minimum_height
         size_hint: 1, None
         padding: "10dp", 0
-        
+
         MDIconButton:
             icon: "play"
             id: play_button
@@ -110,14 +110,14 @@ BoxLayout:
             pos_hint: {'center_y': 0.5, 'center_x': 1}
             user_font_size: "32sp"
             on_press: app.stop_button()
-            
+
     GridLayout:
         height: self.minimum_height
         size_hint: 1, None
         padding:  dp(10), 0
         cols: 2
         row_default_height: mute_button.height
-        
+
         MDIconButton:
             icon: "volume-high"
             id: mute_button
@@ -133,20 +133,20 @@ BoxLayout:
             pos_hint: {'center_y': 0.5}
             on_active: if not self.active: app.set_volume(self.value)
             hint_text: "{:.0f}%".format(self.value)  # fstring does not trigger updates
-        
+
         AnchorLayout:
             anchor_x: "left"
             anchor_y: "center"
             width: mute_button.width + sp(10)
             size_hint_x: None
-            
+
             MDDropDownItem:
                 id: rate_dropdown
                 text: "1.25x"
                 height: volume_slider.height
                 pos_hint: {'center_y': 0.5}
                 on_release: app.rate_menu.open()
-                
+
         MDSlider2:
             id: rate_slider
             min: 0.5 # https://developers.google.com/android/reference/com/google/android/gms/cast/MediaLoadOptions#PLAYBACK_RATE_MIN
@@ -155,7 +155,7 @@ BoxLayout:
             pos_hint: {'center_y': 0.5}
             on_active: if not self.active: app.set_rate(self.value)
             hint_text: "{:.2f}%".format(self.value)
-         
+
     ScrollView:
         GridLayout:
             cols: 1
@@ -164,7 +164,7 @@ BoxLayout:
             padding: "10dp"
             spacing: "10dp"
             height: self.minimum_height
-            
+
             MDLabel:
                 id: status_label
                 height: self.texture_size[1]
@@ -179,13 +179,13 @@ class CastItem(TwoLineIconListItem):
 
 class Settings:
     key = "settings"
-    theme = "Dark"
+    theme = "Light"
     last_cast = None
     last_uuid = None
     last_url = None
     last_resolution = None
-    
-    
+
+
 def update_dialog_items(dialog, items):
     dialog.ids.box_items.clear_widgets()
 
@@ -196,11 +196,22 @@ def update_dialog_items(dialog, items):
         dialog.edit_padding_for_item(item)
         dialog.ids.box_items.add_widget(item)
 
-    if height > Window.height:
+    if height > Window.height or 1:  # This works in newer version of kivymd, but here we have to use full height
         dialog.set_normal_height()
         dialog.ids.scroll.height = dialog.get_normal_height()
     else:
         dialog.ids.scroll.height = height
+
+
+def debounce(f, wait=0.5):  # somehow necessary for android :/
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        nonlocal last_call
+        if (t := time.time()) - last_call >= wait:
+            last_call = t
+            f(*args, **kwargs)
+    last_call = 0
+    return wrapper
 
 
 class CastRemoteApp(MDApp):
@@ -221,7 +232,7 @@ class CastRemoteApp(MDApp):
         return f"{s // 3600}:{s // 60 % 60:02}:{s % 60:02}" if s >= 3600 else f"{s // 60}:{s % 60:02}"
 
     def __init__(self, **kwargs):
-        super().__init__(**kwargs)        
+        super().__init__(**kwargs)
         self.settings = store.get(Settings.key)["settings"]
 
         self.theme_cls.theme_style = self.settings.theme
@@ -229,48 +240,44 @@ class CastRemoteApp(MDApp):
         self.theme_cls.theme_style = self.settings.theme
         self.update_state()
 
-        self.cast_listener = pychromecast.CastListener(self.update_chromecast_discovery, self.update_chromecast_discovery, self.update_chromecast_discovery)
+        self.cast_listener = pychromecast.CastListener(self.update_chromecast_discovery,
+                                                       self.update_chromecast_discovery,
+                                                       self.update_chromecast_discovery)
         self.zconf = zeroconf.Zeroconf()
         self.browser = pychromecast.start_discovery(self.cast_listener, self.zconf)
 
         Clock.schedule_interval(self.tick, 0.2)
 
-        label = self.screen.ids.volume_slider.ids.hint_label
-        # label.text_size = None, None
-        print(label.text_size)
-        # hack_slider(self.screen.ids.volume_slider, lambda x: f"{round(x)}%")
-        # hack_slider(self.screen.ids.seek_slider, lambda x: format_time(x))
-
         self.rate_menu = MDDropdownMenu(
             caller=self.screen.ids.rate_dropdown,
             items=[{"text": f"{x}x", "bot_pad": "12dp"}
                    for x in (0.5, 0.75, 1, 1.25, 1.5, 1.75, 2)],
-            width_mult=2)
-        self.rate_menu.bind(on_release=self.on_rate_menu)
+            width_mult=4,
+            callback=self.on_rate_menu)
 
         self.resolution_menu = MDDropdownMenu(
             caller=self.screen.ids.resolution_dropdown,
-            items=[{"text": f"{x}p", "bot_pad": "12dp"}
+            items=[{"text": f"{x}p"}
                    for x in (2160, 1440, 1080, 720, 480, 360, 240, 144)],
-            width_mult=2)
-        self.resolution_menu.bind(on_release=self.on_resolution_menu)
+            width_mult=4,
+            callback=self.on_resolution_menu)
 
         self.screen.ids.url_text_field.text = self.settings.last_url or ""
         self.max_resolution = self.settings.last_resolution or 2160
         self.screen.ids.resolution_dropdown.text = f"{self.max_resolution}p"
-        
+
         self.serve_files = {}
         self.server_thread, self.server = serve(self.serve_files, PORT)
 
-    def on_rate_menu(self, menu, item):
+    def on_rate_menu(self, item):
         self.set_rate(float(item.text[:-1]))
-        menu.dismiss()
-        
-    def on_resolution_menu(self, menu, item):
+        self.rate_menu.dismiss()
+
+    def on_resolution_menu(self, item):
         self.settings.last_resolution = self.max_resolution = int(item.text[:-1])
         self.save()
         self.screen.ids.resolution_dropdown.text = item.text
-        menu.dismiss()
+        self.resolution_menu.dismiss()
 
     def update_chromecast_discovery(self, *args):
         self.cast_dialog_items = [
@@ -284,7 +291,7 @@ class CastRemoteApp(MDApp):
                 self.select_cast(devices[0])
         if self.cast_dialog:
             update_dialog_items(self.cast_dialog, self.cast_dialog_items)
-    
+
     def tick(self, dt):
         self.update_state()
 
@@ -298,27 +305,29 @@ class CastRemoteApp(MDApp):
     def on_pause(self):
         self.save()
         return True
-    
+
     def cast_url(self, url):
         self.settings.last_url = url
         self.save()
         if not url:
             return
 
-        ydl_opts = {"format": "best"}
+        ydl_opts = {"format": "best", "nocheckcertificate": True}
         try:
             with FixedYoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=False)
         except youtube_dl.utils.YoutubeDLError as e:
             print(e)
-            Snackbar(text=f"Exception: {e}").open()
-            
-        codecs = ("vp8", "avc") if self.cast.model_name == "Chromecast" else CODECS  # TODO match https://developers.google.com/cast/docs/media
+            Snackbar(text=f"Exception: {e}").show()
+            return
+
+        codecs = ("vp8",
+                  "avc") if self.cast.model_name == "Chromecast" else CODECS  # TODO match https://developers.google.com/cast/docs/media
         cast_url = info["url"]
         mime = format_mime(info)
         if info["vcodec"] != "none":
-            best_height = max(f["height"] for f in info["formats"] if any(c.startswith(f["vcodec"]) for c in codecs))
-            if info["height"] < best_height:
+            if (heights := [f["height"] for f in info["formats"] if any(f["vcodec"].startswith(c) for c in codecs)]) \
+                    and info["height"] < max(heights):
                 try:
                     mpd = build_mpd(info, CORS_PROXY, codecs, self.max_resolution)
                     mime = "application/dash+xml"
@@ -326,8 +335,8 @@ class CastRemoteApp(MDApp):
                     self.serve_files["mpd"] = (mpd, mime)
                 except Exception as e:
                     print(e)
-                    Snackbar(text=f"MPD exception, fallback to URL: {e}")
-        
+                    Snackbar(text=f"MPD exception, fallback to URL: {e}").show()
+
         title = info["title"]
         toast("Casting: " + title)
         self.cast.media_controller.play_media(cast_url, mime, title)
@@ -335,10 +344,13 @@ class CastRemoteApp(MDApp):
     def save(self):
         store.put(Settings.key, settings=self.settings)
 
+    @debounce
     def switch_theme_style(self):
         self.theme_cls.theme_style = self.settings.theme = \
             "Light" if self.settings.theme == "Dark" else "Dark"
+        print('New theme', self.theme_cls.theme_style)
 
+    @debounce
     def show_select_dialog(self):
         if not self.cast_dialog:
             self.cast_dialog = MDDialog(title="Select Chromecast", type="simple", on_dismiss=self.cast_dialog_dismiss)
@@ -374,11 +386,12 @@ class CastRemoteApp(MDApp):
 
         self.update_state()
 
+    @debounce
     def cast_dialog_dismiss(self, *args):
         print("dismissed dialog")
         pychromecast.stop_discovery(self.browser)
         self.browser = None
-        
+
     def new_media_status(self, status):
         self.media_status = status
         self.update_state()
@@ -391,25 +404,25 @@ class CastRemoteApp(MDApp):
         self.cast_status = status
         self.update_state()
         print("cast status", status)
-        
+
     def mute(self):
-        self.cast.set_volume_muted(not self.cast_status.volume_muted)     
-        
+        self.cast.set_volume_muted(not self.cast_status.volume_muted)
+
     def set_volume(self, volume):
-        self.cast.set_volume(volume/100)
-        
+        self.cast.set_volume(volume / 100)
+
     def play_pause(self, *args):
         if self.is_playing:
             self.cast.media_controller.pause()
         else:
             self.cast.media_controller.play()
-            
+
     def stop_button(self):
         self.cast.media_controller.stop()
-        
+
     def seek(self, pos):
         self.cast.media_controller.seek(pos)
-        
+
     def set_rate(self, rate):
         self.cast.media_controller.set_playback_rate(rate)
 
@@ -432,7 +445,7 @@ class CastRemoteApp(MDApp):
 
         if cs := self.cast_status:
             status_text += f"""
-Volume: {round(cs.volume_level*100)}%{' (muted)' * cs.volume_muted}
+Volume: {round(cs.volume_level * 100)}%{' (muted)' * cs.volume_muted}
 display_name: {cs.display_name}
 status_text: {cs.status_text}
 is_stand_by: {cs.is_stand_by}
@@ -469,7 +482,7 @@ supports:{' pause' * ms.supports_pause + ' seek' * ms.supports_seek + ' playback
                 seek_slider.value = int(ms.adjusted_current_time)
 
             seek_slider.disabled = not ms.supports_seek
-            #time_label.text_size = None, None
+            # time_label.text_size = None, None
             time_label.text = f"{self.format_time(ms.adjusted_current_time)} / {self.format_time(ms.duration) if ms.duration else '-'}  •  {ms.title}"
             stop_button.disabled = False
 
@@ -485,7 +498,7 @@ supports:{' pause' * ms.supports_pause + ' seek' * ms.supports_seek + ' playback
             rate_slider.disabled = True
             rate_dropdown.disabled = True
             # time_label.text = "-/-"
-        
+
         self.screen.ids.status_label.text = status_text
 
     def set_cast_icon(self, connected):
